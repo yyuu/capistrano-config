@@ -1,5 +1,5 @@
 module Capistrano
-  module Config
+  module ConfigRecipe
     VERSION = "0.0.2git"
   end
 end
