@@ -52,17 +52,19 @@ module Capistrano
             options = {
               :readable_files => [], :writable_files => [], :executable_files => [],
               :remove_files => [],
+              :use_sudo => true,
             }.merge(options)
             dirs = src_tmp_tgt.map { |src, tmp, tgt| File.dirname(tgt) }.uniq
+            try_sudo = options[:use_sudo] ? sudo : ""
             execute = []
             execute << "mkdir -p #{dirs.join(' ')}" unless dirs.empty?
             src_tmp_tgt.map { |src, tmp, tgt|
-              execute << "( diff -u #{tgt} #{tmp} || #{sudo} mv -f #{tmp} #{tgt} )"
+              execute << "( diff -u #{tgt} #{tmp} || #{try_sudo} mv -f #{tmp} #{tgt} )"
             }
-            execute << "#{sudo} chmod #{config_readable_mode} #{options[:readable_files].join(' ')}" unless options[:readable_files].empty?
-            execute << "#{sudo} chmod #{config_writable_mode} #{options[:writable_files].join(' ')}" unless options[:writable_files].empty?
-            execute << "#{sudo} chmod #{config_executable_mode} #{options[:executable_files].join(' ')}" unless options[:executable_files].empty?
-            execute << "#{sudo} rm -f #{options[:remove_files].join(' ')}" unless options[:remove_files].empty?
+            execute << "#{try_sudo} chmod #{config_readable_mode} #{options[:readable_files].join(' ')}" unless options[:readable_files].empty?
+            execute << "#{try_sudo} chmod #{config_writable_mode} #{options[:writable_files].join(' ')}" unless options[:writable_files].empty?
+            execute << "#{try_sudo} chmod #{config_executable_mode} #{options[:executable_files].join(' ')}" unless options[:executable_files].empty?
+            execute << "#{try_sudo} rm -f #{options[:remove_files].join(' ')}" unless options[:remove_files].empty?
 
             execute.join(' && ')
           end
@@ -75,6 +77,7 @@ module Capistrano
                 File.open(tmp, 'wb') { |fp| fp.write(_read_config(src)) } unless dry_run
               }
               run_locally(_do_update(src_tmp_tgt,
+                :use_sudo => fetch(:config_use_sudo_locally, false),
                 :readable_files => config_readable_files.map { |f| File.join(config_path_local, f) },
                 :writable_files => config_writable_files.map { |f| File.join(config_path_local, f) },
                 :executable_files => config_executable_files.map { |f| File.join(config_path_local, f) },
@@ -92,6 +95,7 @@ module Capistrano
                 put(_read_config(src), tmp)
               }
               run(_do_update(src_tmp_tgt,
+                :use_sudo => fetch(:config_use_sudo_remotely, true),
                 :readable_files => config_readable_files.map { |f| File.join(config_path, f) },
                 :writable_files => config_writable_files.map { |f| File.join(config_path, f) },
                 :executable_files => config_executable_files.map { |f| File.join(config_path, f) },

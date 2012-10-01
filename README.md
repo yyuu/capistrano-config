@@ -31,6 +31,8 @@ Following options are available to manage your configuration files.
 
  * `:config_update_remotely` - specify whether update config files on remote machines or not. `true` by default.
  * `:config_update_locally` - specify whether update config files on local machines or not. `false` by default.
+ * `:config_use_sudo_locally` - specify whether use `sudo` or not on local execution. `false` by default.
+ * `:config_use_sudo_remotely` - specify whether use `sudo` or not on remote execution. `true` by default.
  * `:config_path` - specify configuration base directory on remote machines. use `release_path` by default.
  * `:config_path_local` - specify configuration base directory on local machine. use `.` by default.
  * `:config_template_path` - specify configuration template directory on local machine. use `./config/templates` by default.
