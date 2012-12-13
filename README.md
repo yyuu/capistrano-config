@@ -40,7 +40,6 @@ Following options are available to manage your configuration files.
  * `:config_readable_files` - list of files which should be readable. empty by default.
  * `:config_writable_files` - list of files which should be writable. empty by default.
  * `:config_executable_files` - list of files which should be executable. empty by default.
- * `:config_remove_files` - list of files which should be removed. empty by default.
 
 ## Contributing
 

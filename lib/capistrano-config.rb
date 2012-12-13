@@ -11,16 +11,10 @@ module Capistrano
           _cset(:config_path_local) { File.expand_path('.') }
           _cset(:config_template_path) { File.join(File.expand_path('.'), 'config', 'templates') }
           _cset(:config_files, [])
-          _cset(:config_source_files) {
-            config_files.map { |file| File.join(config_template_path, file) }
-          }
-          _cset(:config_temporary_files) {
-            config_files.map { |file|
-              f = Tempfile.new('config'); t = f.path
-              f.close(true) # remote tempfile immediately
-              t
-            }
-          }
+
+          _cset(:config_use_shared, false)
+          _cset(:config_shared_path) { File.join(shared_path, 'config') }
+
           _cset(:config_readable_mode, "ug+r")
           _cset(:config_readable_files, [])
           _cset(:config_writable_mode, "ug+rw")
@@ -29,16 +23,14 @@ module Capistrano
           _cset(:config_executable_files, [])
           _cset(:config_remove_files, [])
 
-          desc("Update applicatin config.")
-          task(:update, :roles => :app, :except => { :no_release => true }) {
-            transaction {
-              update_locally if fetch(:config_update_locally, false)
-              update_remotely if fetch(:config_update_remotely, true)
-            }
-          }
-          after 'deploy:finalize_update', 'config:update'
+          def tempfile(name)
+            f = Tempfile.new(name)
+            path = f.path
+            f.close(true) # close and remove tempfile immediately
+            path
+          end
 
-          def _read_config(config)
+          def template(config)
             if File.file?(config)
               File.read(config)
             elsif File.file?("#{config}.erb")
@@ -48,61 +40,111 @@ module Capistrano
             end
           end
 
-          def _do_update(src_tmp_tgt, options={})
-            options = {
-              :readable_files => [], :writable_files => [], :executable_files => [],
-              :remove_files => [],
-              :use_sudo => true,
-            }.merge(options)
-            dirs = src_tmp_tgt.map { |src, tmp, tgt| File.dirname(tgt) }.uniq
+          def update_one(source, target, options={})
             try_sudo = options[:use_sudo] ? sudo : ""
             execute = []
-            execute << "mkdir -p #{dirs.join(' ')}" unless dirs.empty?
-            src_tmp_tgt.map { |src, tmp, tgt|
-              execute << "( diff -u #{tgt} #{tmp} || #{try_sudo} mv -f #{tmp} #{tgt} )"
-            }
-            execute << "#{try_sudo} chmod #{config_readable_mode} #{options[:readable_files].join(' ')}" unless options[:readable_files].empty?
-            execute << "#{try_sudo} chmod #{config_writable_mode} #{options[:writable_files].join(' ')}" unless options[:writable_files].empty?
-            execute << "#{try_sudo} chmod #{config_executable_mode} #{options[:executable_files].join(' ')}" unless options[:executable_files].empty?
-            execute << "#{try_sudo} rm -f #{options[:remove_files].join(' ')}" unless options[:remove_files].empty?
+            dirs = [ File.dirname(source), File.dirname(target) ].uniq
+            execute << "#{try_sudo} mkdir -p #{dirs.map { |d| d.dump }.join(' ')}"
+            execute << "( #{try_sudo} diff -u #{target.dump} #{source.dump} || #{try_sudo} mv -f #{source.dump} #{target.dump} )"
+
+            execute << "#{try_sudo} chmod #{config_readable_mode} #{target.dump}" if options[:readable_file].include?(target)
+            execute << "#{try_sudo} chmod #{config_writable_mode} #{target.dump}" if options[:writable_file].include?(target)
+            execute << "#{try_sudo} chmod #{config_executable_mode} #{target.dump}" if options[:executable_file].include?(target)
+            execute << "#{try_sudo} rm -f #{config_remove_files.map { |f| f.dump }.join(' ')}" if options[:remove_files].include?(target)
 
             execute.join(' && ')
           end
 
-          task(:update_locally, :roles => :app, :except => { :no_release => true }) {
+          def update_all(files={}, options={})
+            srcs = files.map { |src, dst| src }
+            tmps = files.map { tempfile("capistrano-config") }
+            dsts = files.map { |src, dst| dst }
             begin
-              target_files = config_files.map { |f| File.join(config_path_local, f) }
-              src_tmp_tgt = config_source_files.zip(config_temporary_files, target_files)
-              src_tmp_tgt.each { |src, tmp, tgt|
-                File.open(tmp, 'wb') { |fp| fp.write(_read_config(src)) } unless dry_run
-              }
-              run_locally(_do_update(src_tmp_tgt,
-                :use_sudo => fetch(:config_use_sudo_locally, false),
-                :readable_files => config_readable_files.map { |f| File.join(config_path_local, f) },
-                :writable_files => config_writable_files.map { |f| File.join(config_path_local, f) },
-                :executable_files => config_executable_files.map { |f| File.join(config_path_local, f) },
-                :remove_files => config_remove_files.map { |f| File.join(config_path_local, f) }))
+              srcs.zip(tmps).each do |src, tmp|
+                put(template(src), tmp)
+              end
+              tmps.zip(dsts).each do |tmp, dst|
+                run(update_one(tmp, dst, options.merge(:use_sudo => fetch(:config_use_sudo_remotely, false))))
+              end
             ensure
-              run_locally("rm -f #{config_temporary_files.join(' ')}") unless config_temporary_files.empty?
+              run("rm -f #{tmp.map { |f| f.dump }.join(' ')}") unless tmps.empty?
+            end
+          end
+
+          def update_all_locally(files={})
+            srcs = files.map { |src, dst| src }
+            tmps = files.map { tempfile("capistrano-config") }
+            dsts = files.map { |src, dst| dst }
+            begin
+              srcs.zip(tmps).each do |src, tmp|
+                File.open(tmp, 'wb') { |fp| fp.write(template(src)) } unless dry_run
+              end
+              tmps.zip(dsts).each do |tmp, dst|
+                run_locally(update_one(tmp, dst, options.merge(:use_sudo => fetch(:config_use_sudo_locally, false))))
+              end
+            ensure
+              run_locally("rm -f #{tmp.map { |f| f.dump }.join(' ')}") unless tmps.empty?
+            end
+          end
+
+          def symlink_all(files={})
+            execute = []
+            files.each do |src, dst|
+              execute << "ln -s #{src.dump} #{dst.dump}"
+            end
+            run(execute.join(' && '))
+          end
+
+          desc("Setup shared application config.")
+          task(:setup, :roles => :app, :except => { :no_release => true }) {
+            if config_use_shared
+              srcs = config_files.map { |f| File.join(config_template_path, f) }
+              dsts = config_files.map { |f| File.join(config_shared_path, f) }
+              update_all(srcs.zip(dsts),
+                :readable_files => config_readable_files.map { |f| File.join(config_shared_path, f) },
+                :writable_files => config_writable_files.map { |f| File.join(config_shared_path, f) },
+                :executable_files => config_executable_files.map { |f| File.join(config_shared_path, f) },
+                :remove_files => config_remove_files.map { |f| File.join(config_shared_path, f) }
+              )
             end
           }
+          after 'deploy:setup', 'config:setup'
+
+          desc("Update applicatin config.")
+          task(:update, :roles => :app, :except => { :no_release => true }) {
+            transaction {
+              update_remotely if fetch(:config_update_remotely, true)
+              update_locally if fetch(:config_update_locally, false)
+            }
+          }
+          after 'deploy:finalize_update', 'config:update'
 
           task(:update_remotely, :roles => :app, :except => { :no_release => true }) {
-            begin
-              target_files = config_files.map { |f| File.join(config_path, f) }
-              src_tmp_tgt = config_source_files.zip(config_temporary_files, target_files)
-              src_tmp_tgt.each { |src, tmp, tgt|
-                put(_read_config(src), tmp)
-              }
-              run(_do_update(src_tmp_tgt,
-                :use_sudo => fetch(:config_use_sudo_remotely, true),
+            if config_use_shared
+              srcs = config_files.map { |f| File.join(config_shared_path, f) }
+              dsts = config_files.map { |f| File.join(config_path, f) }
+              symlink_all(srcs.zip(dsts))
+            else
+              srcs = config_files.map { |f| File.join(config_template_path, f) }
+              dsts = config_files.map { |f| File.join(config_path, f) }
+              update_all(srcs.zip(dsts),
                 :readable_files => config_readable_files.map { |f| File.join(config_path, f) },
                 :writable_files => config_writable_files.map { |f| File.join(config_path, f) },
                 :executable_files => config_executable_files.map { |f| File.join(config_path, f) },
-                :remove_files => config_remove_files.map { |f| File.join(config_path, f) }))
-            ensure
-              run("rm -f #{config_temporary_files.join(' ')}") unless config_temporary_files.empty?
+                :remove_files => config_remove_files.map { |f| File.join(config_path, f) }
+              )
             end
+          }
+
+          task(:update_locally, :roles => :app, :except => { :no_release => true }) {
+            srcs = config_files.map { |f| File.join(config_template_path, f) }
+            dsts = config_files.map { |f| File.join(config_path_local, f) }
+            update_all_locally(srcs.zip(dsts),
+              :readable_files => config_readable_files.map { |f| File.join(config_path_local, f) },
+              :writable_files => config_writable_files.map { |f| File.join(config_path_local, f) },
+              :executable_files => config_executable_files.map { |f| File.join(config_path_local, f) },
+              :remove_files => config_remove_files.map { |f| File.join(config_path_local, f) }
+            )
           }
         }
       }
