@@ -47,9 +47,9 @@ module Capistrano
             execute << "#{try_sudo} mkdir -p #{dirs.map { |d| d.dump }.join(' ')}"
             execute << "( #{try_sudo} diff -u #{target.dump} #{source.dump} || #{try_sudo} mv -f #{source.dump} #{target.dump} )"
 
-            execute << "#{try_sudo} chmod #{config_readable_mode} #{target.dump}" if options[:readable_file].include?(target)
-            execute << "#{try_sudo} chmod #{config_writable_mode} #{target.dump}" if options[:writable_file].include?(target)
-            execute << "#{try_sudo} chmod #{config_executable_mode} #{target.dump}" if options[:executable_file].include?(target)
+            execute << "#{try_sudo} chmod #{config_readable_mode} #{target.dump}" if options[:readable_files].include?(target)
+            execute << "#{try_sudo} chmod #{config_writable_mode} #{target.dump}" if options[:writable_files].include?(target)
+            execute << "#{try_sudo} chmod #{config_executable_mode} #{target.dump}" if options[:executable_files].include?(target)
             execute << "#{try_sudo} rm -f #{config_remove_files.map { |f| f.dump }.join(' ')}" if options[:remove_files].include?(target)
 
             execute.join(' && ')
@@ -67,7 +67,7 @@ module Capistrano
                 run(update_one(tmp, dst, options.merge(:use_sudo => fetch(:config_use_sudo_remotely, false))))
               end
             ensure
-              run("rm -f #{tmp.map { |f| f.dump }.join(' ')}") unless tmps.empty?
+              run("rm -f #{tmps.map { |f| f.dump }.join(' ')}") unless tmps.empty?
             end
           end
 
@@ -83,14 +83,14 @@ module Capistrano
                 run_locally(update_one(tmp, dst, options.merge(:use_sudo => fetch(:config_use_sudo_locally, false))))
               end
             ensure
-              run_locally("rm -f #{tmp.map { |f| f.dump }.join(' ')}") unless tmps.empty?
+              run_locally("rm -f #{tmps.map { |f| f.dump }.join(' ')}") unless tmps.empty?
             end
           end
 
           def symlink_all(files={})
             execute = []
             files.each do |src, dst|
-              execute << "ln -s #{src.dump} #{dst.dump}"
+              execute << "( rm -f #{dst.dump} && ln -s #{src.dump} #{dst.dump} )"
             end
             run(execute.join(' && '))
           end
