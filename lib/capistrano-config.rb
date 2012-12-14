@@ -71,7 +71,7 @@ module Capistrano
             end
           end
 
-          def update_all_locally(files={})
+          def update_all_locally(files={}, options={})
             srcs = files.map { |src, dst| src }
             tmps = files.map { tempfile("capistrano-config") }
             dsts = files.map { |src, dst| dst }
@@ -87,7 +87,7 @@ module Capistrano
             end
           end
 
-          def symlink_all(files={})
+          def symlink_all(files={}, options={})
             execute = []
             files.each do |src, dst|
               execute << "( rm -f #{dst.dump} && ln -s #{src.dump} #{dst.dump} )"
