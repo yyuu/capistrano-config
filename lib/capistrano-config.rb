@@ -1,6 +1,5 @@
 require "capistrano-config/version"
-require 'erb'
-require 'tempfile'
+require "erb"
 
 module Capistrano
   module ConfigRecipe
@@ -22,13 +21,6 @@ module Capistrano
           _cset(:config_executable_mode, "ug+rx")
           _cset(:config_executable_files, [])
           _cset(:config_remove_files, [])
-
-          def tempfile(name)
-            f = Tempfile.new(name)
-            path = f.path
-            f.close(true) # close and remove tempfile immediately
-            path
-          end
 
           def template(config)
             if File.file?(config)
@@ -57,7 +49,7 @@ module Capistrano
 
           def update_all(files={}, options={})
             srcs = files.map { |src, dst| src }
-            tmps = files.map { tempfile("capistrano-config") }
+            tmps = files.map { capture("mktemp") }
             dsts = files.map { |src, dst| dst }
             begin
               srcs.zip(tmps).each do |src, tmp|
@@ -73,7 +65,7 @@ module Capistrano
 
           def update_all_locally(files={}, options={})
             srcs = files.map { |src, dst| src }
-            tmps = files.map { tempfile("capistrano-config") }
+            tmps = files.map { capture("mktemp") }
             dsts = files.map { |src, dst| dst }
             begin
               srcs.zip(tmps).each do |src, tmp|
