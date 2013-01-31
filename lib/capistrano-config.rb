@@ -49,7 +49,7 @@ module Capistrano
 
           def update_all(files={}, options={})
             srcs = files.map { |src, dst| src }
-            tmps = files.map { capture("mktemp") }
+            tmps = files.map { capture("mktemp").chomp }
             dsts = files.map { |src, dst| dst }
             begin
               srcs.zip(tmps).each do |src, tmp|
@@ -65,7 +65,7 @@ module Capistrano
 
           def update_all_locally(files={}, options={})
             srcs = files.map { |src, dst| src }
-            tmps = files.map { capture("mktemp") }
+            tmps = files.map { capture("mktemp").chomp }
             dsts = files.map { |src, dst| dst }
             begin
               srcs.zip(tmps).each do |src, tmp|
