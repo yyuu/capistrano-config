@@ -18,4 +18,6 @@ Gem::Specification.new do |gem|
   gem.require_paths = ["lib"]
 
   gem.add_dependency("capistrano")
+  gem.add_dependency("capistrano-file-resources")
+  gem.add_dependency("capistrano-file-transfer-ext")
 end
