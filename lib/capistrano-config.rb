@@ -35,7 +35,7 @@ module Capistrano
               execute << "#{try_sudo} chmod #{config_writable_mode} #{config_writable_files.map { |f| File.join(config_shared_path, f).dump }.join(' ')}" unless config_writable_files.empty?
               execute << "#{try_sudo} chmod #{config_executable_mode} #{config_executable_files.map { |f| File.join(config_shared_path, f).dump }.join(' ')}" unless config_executable_files.empty?
               execute << "#{try_sudo} rm -f #{config_remove_files.map { |f| File.join(config_shared_path, f).dump }.join(' ')}" unless config_remove_files.empty?
-              run(execute.join(" && "))
+              run(execute.join(" && ")) unless execute.empty?
             end
           }
           after 'deploy:setup', 'config:setup'
@@ -56,7 +56,7 @@ module Capistrano
                 execute << "( rm -f #{File.join(config_shared_path, f).dump}; " +
                            "ln -sf #{File.join(config_shared_path, f).dump} #{File.join(config_path, f).dump} )"
               end
-              run(execute.join(" && "))
+              run(execute.join(" && ")) unless execute.empty?
             else
               config_files.each do |f|
                 safe_put(template(f, :path => config_template_path), File.join(config_path, f), :place => :if_modified)
@@ -66,7 +66,7 @@ module Capistrano
               execute << "#{try_sudo} chmod #{config_writable_mode} #{config_writable_files.map { |f| File.join(config_path, f).dump }.join(' ')}" unless config_writable_files.empty?
               execute << "#{try_sudo} chmod #{config_executable_mode} #{config_executable_files.map { |f| File.join(config_path, f).dump }.join(' ')}" unless config_executable_files.empty?
               execute << "#{try_sudo} rm -f #{config_remove_files.map { |f| File.join(config_path, f).dump }.join(' ')}" unless config_remove_files.empty?
-              run(execute.join(" && "))
+              run(execute.join(" && ")) unless execute.empty?
             end
           }
 
@@ -79,7 +79,7 @@ module Capistrano
             execute << "#{try_sudo} chmod #{config_writable_mode} #{config_writable_files.map { |f| File.join(config_path_local, f).dump }.join(' ')}" unless config_writable_files.empty?
             execute << "#{try_sudo} chmod #{config_executable_mode} #{config_executable_files.map { |f| File.join(config_path_local, f).dump }.join(' ')}" unless config_executable_files.empty?
             execute << "#{try_sudo} rm -f #{config_remove_files.map { |f| File.join(config_path_local, f).dump }.join(' ')}" unless config_remove_files.empty?
-            run(execute.join(" && "))
+            run(execute.join(" && ")) unless execute.empty?
           }
         }
       }
