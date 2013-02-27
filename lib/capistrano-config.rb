@@ -53,7 +53,7 @@ module Capistrano
             if config_use_shared
               execute = []
               config_files.each do |f|
-                execute << "( rm -f #{File.join(config_shared_path, f).dump}; " +
+                execute << "( rm -f #{File.join(config_path, f).dump}; " +
                            "ln -sf #{File.join(config_shared_path, f).dump} #{File.join(config_path, f).dump} )"
               end
               run(execute.join(" && ")) unless execute.empty?
