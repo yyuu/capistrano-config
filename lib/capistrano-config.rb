@@ -79,7 +79,7 @@ module Capistrano
             execute << "#{try_sudo} chmod #{config_writable_mode} #{config_writable_files.map { |f| File.join(config_path_local, f).dump }.join(' ')}" unless config_writable_files.empty?
             execute << "#{try_sudo} chmod #{config_executable_mode} #{config_executable_files.map { |f| File.join(config_path_local, f).dump }.join(' ')}" unless config_executable_files.empty?
             execute << "#{try_sudo} rm -f #{config_remove_files.map { |f| File.join(config_path_local, f).dump }.join(' ')}" unless config_remove_files.empty?
-            run(execute.join(" && ")) unless execute.empty?
+            run_locally(execute.join(" && ")) unless execute.empty?
           }
         }
       }
