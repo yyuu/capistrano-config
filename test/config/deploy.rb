@@ -16,6 +16,7 @@ role :db,  "192.168.33.10", :primary => true
 
 $LOAD_PATH.push(File.expand_path("../../lib", File.dirname(__FILE__)))
 require "capistrano-config"
+require "tempfile"
 
 def _invoke_command(cmdline, options={})
   via = options.delete(:via)
@@ -27,9 +28,15 @@ def _invoke_command(cmdline, options={})
 end
 
 def assert_file_content(file, content, options={})
-  content = content.chomp # FIXME: need more canonical checks
   begin
-    _invoke_command("test -f #{file.dump} && test #{content.dump} = $(cat #{file.dump})", options)
+    if options[:via] == :run_locally
+      remote_content = File.read(file)
+    else
+      tempfile = Tempfile.new("tmp")
+      download(file, tempfile.path)
+      remote_content = tempfile.read
+    end
+    abort if content != remote_content
   rescue
     logger.debug("assert_file_content(#{file}, #{content}) failed.")
     _invoke_command("cat #{file.dump}", options)
