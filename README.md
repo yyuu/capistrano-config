@@ -80,6 +80,17 @@ If you want to apply for all configuration files, you can use `:config_files_opt
     set :config_files, ["config/secret.yml", "config/credentials.yml"]
     set :config_files_options, :owner => "user", :group => "user", :mode => "640"
 
+### Setting up files with absolute paths
+
+If the configuration file name starts with "/", it will be treated as absolute path.
+
+    # config/deploy.rb
+    set :config_files do
+      {
+        "/etc/init/foo.cnf" => { :configure_except => :local, :owner => "root", :group => "root", :mode => "644", :run_method => :sudo },
+      }
+    end
+
 
 ## Reference
 
