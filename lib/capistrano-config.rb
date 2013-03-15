@@ -75,7 +75,7 @@ module Capistrano
               run(execute.join(" && ")) unless execute.empty?
             else
               _normalize_config_files(config_files).each do |file, options|
-                safe_put(template(file, :path => config_template_path), File.join(config_path, file))
+                safe_put(template(file, :path => config_template_path), File.join(config_path, file), options)
               end
             end
           }
