@@ -169,12 +169,12 @@ namespace(:test_with_options) {
     set(:config_template_path, "tmp")
     set(:config_files, {
       "secret" => {:mode => 0640},
-      "/etc/__privileged__" => { :run_method => :sudo, :owner => 0, :group => 0 },
+      "/etc/__privileged__" => { :configure_except => :local, :run_method => :sudo, :owner => 0, :group => 0 },
     })
     set(:config_path_local, "tmp/local")
     set(:config_use_shared, false)
     set(:config_update_remotely, true)
-    set(:config_update_locally, false)
+    set(:config_update_locally, true)
     find_and_execute_task("deploy:setup")
   }
 

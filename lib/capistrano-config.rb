@@ -46,11 +46,19 @@ module Capistrano
             end
           end
 
+          def _target?(s, options={})
+            except = Array(options[:configure_except]).flatten.map { |s| s.to_sym }
+            only = Array(options[:configur_only]).flatten.map { |s| s.to_sym }
+            ( except.empty? or not(except.include?(s)) ) and ( only.empty? or only.include?(s) )
+          end
+
           desc("Setup shared application config.")
           task(:setup, :roles => :app, :except => { :no_release => true }) {
             if config_use_shared
               _normalize_config_files(config_files).each do |file, options|
-                safe_put(template(file, :path => config_template_path), File.join(config_shared_path, file), options)
+                if _target?(:shared, options)
+                  safe_put(template(file, :path => config_template_path), File.join(config_shared_path, file), options)
+                end
               end
             end
           }
@@ -73,27 +81,31 @@ module Capistrano
             execute = []
             _normalize_config_files(config_files).each do |file, options|
               destination = _destination_file(file, :path => config_path)
-              if config_use_shared
+              if config_use_shared and _target?(:shared, options)
                 execute << "( rm -f #{destination.dump}; " +
                            "ln -sf #{File.join(config_shared_path, file).dump} #{destination.dump} )"
-              else
+              elsif _target?(:remote, options)
                 safe_put(template(file, :path => config_template_path), destination, options)
               end
             end
             run(execute.join(" && ")) unless execute.empty?
           }
 
+          def safe_put_locally(body, to, options={})
+            File.write(to, body)
+            if options.key?(:mode)
+              mode = options[:mode].is_a?(Numeric) ? options[:mode].to_s(8) : options[:mode].to_s
+              run_locally("chmod #{mode.dump} #{to.dump}")
+            end
+          end
+
           task(:update_locally, :roles => :app, :except => { :no_release => true }) {
-            execute = []
             _normalize_config_files(config_files).each do |file, options|
-              destination = _destination_file(file, :path => config_path_local)
-              File.write(destination, template(file, :path => config_template_path))
-              if options.key?(:mode)
-                mode = options[:mode].is_a?(Numeric) ? options[:mode].to_s(8) : options[:mode].to_s
-                execute << "chmod #{mode}  #{File.join(config_path_local, file).dump}"
+              if _target?(:local, options)
+                destination = _destination_file(file, :path => config_path_local)
+                safe_put_locally(template(file, :path => config_template_path), destination, options)
               end
             end
-            run_locally(execute.join(" && ")) unless execute.empty?
           }
         }
       }
