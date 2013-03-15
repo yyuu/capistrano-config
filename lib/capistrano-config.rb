@@ -65,25 +65,29 @@ module Capistrano
           }
           after "deploy:finalize_update", "config:update"
 
+          def _destination_file(file, options={})
+            file.start_with?("/") ? file : File.join(options.fetch(:path, "."), file)
+          end
+
           task(:update_remotely, :roles => :app, :except => { :no_release => true }) {
-            if config_use_shared
-              execute = []
-              _normalize_config_files(config_files).each do |file, options|
-                execute << "( rm -f #{File.join(config_path, file).dump}; " +
-                           "ln -sf #{File.join(config_shared_path, file).dump} #{File.join(config_path, file).dump} )"
-              end
-              run(execute.join(" && ")) unless execute.empty?
-            else
-              _normalize_config_files(config_files).each do |file, options|
-                safe_put(template(file, :path => config_template_path), File.join(config_path, file), options)
+            execute = []
+            _normalize_config_files(config_files).each do |file, options|
+              destination = _destination_file(file, :path => config_path)
+              if config_use_shared
+                execute << "( rm -f #{destination.dump}; " +
+                           "ln -sf #{File.join(config_shared_path, file).dump} #{destination.dump} )"
+              else
+                safe_put(template(file, :path => config_template_path), destination, options)
               end
             end
+            run(execute.join(" && ")) unless execute.empty?
           }
 
           task(:update_locally, :roles => :app, :except => { :no_release => true }) {
             execute = []
             _normalize_config_files(config_files).each do |file, options|
-              File.write(File.join(config_path_local, file), template(file, :path => config_template_path))
+              destination = _destination_file(file, :path => config_path_local)
+              File.write(destination, template(file, :path => config_template_path))
               if options.key?(:mode)
                 mode = options[:mode].is_a?(Numeric) ? options[:mode].to_s(8) : options[:mode].to_s
                 execute << "chmod #{mode}  #{File.join(config_path_local, file).dump}"
